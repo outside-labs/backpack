@@ -16,8 +16,12 @@ from .errors import (
     ValidationError,
 )
 from .records import JSONObject, JSONValue, Provenance, RawRecord, Record
+from .store import Backpack, FindPage, WriteResult
 
 __all__ = [
+    "Backpack",
+    "FindPage",
+    "WriteResult",
     "BackpackError",
     "Codec",
     "CodecError",

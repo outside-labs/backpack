@@ -1,8 +1,8 @@
 # Backpack
 
 Backpack is an experimental programmable local store for typed records. The
-current foundation defines explicit codecs, record identity and provenance; the
-SQLite persistence API is the next milestone.
+SQLite API stores finite JSON with explicit codecs, local identity and provenance.
+Records recover their Python types after closing and reopening the database.
 
 - Product: Backpack
 - Distribution: `outside-labs-backpack`
@@ -43,6 +43,50 @@ JSON payloads must be finite objects, at most 1 MiB and 64 nesting levels. Tags
 are case-sensitive NFC strings, trimmed, deduplicated and sorted (up to 64 supplied
 values of 128 characters). Unknown types/versions and invalid payloads raise typed
 errors. Importing the package opens no files or database and performs no network I/O.
+
+## Durable local storage
+
+```python
+from backpack_store import Backpack
+
+with Backpack.open("notes.sqlite") as store:
+    store.register(DataclassCodec(Note, type_key="notes.note"))
+    written = store.put(Note("Example", "Local text"), tags=["work"])
+
+with Backpack.open("notes.sqlite") as store:
+    store.register(DataclassCodec(Note, type_key="notes.note"))
+    note = store.get(written.id)
+    record = store.get_record(written.id)  # envelope plus .value
+    page = store.find(Note, tags=["work"], limit=20)
+    updated = store.update(written.id, Note("Revised", "Local text"),
+                           expected_revision=record.revision, tags=["work"])
+    assert updated.revision == 2
+    assert store.delete(written.id)
+```
+
+Each `put` creates a new UUID and returns `WriteResult(id, revision)`. `update`
+replaces payload, tags and provenance together, preserves the local ID/type key
+and creation time, and requires the expected revision. A stale revision raises
+`RevisionConflictError` without changing the record. Missing reads/updates raise
+`NotFoundError`; deletion returns whether a row existed. Payload, metadata and
+tag writes share one transaction. Invalid input and database failures leave no
+partial record.
+
+`find` requires an explicitly registered Python type and matches **all** requested
+tags. It returns at most 1,000 records (default 50) in ascending local UUID order.
+Pass `.next_cursor` with the same type/tags to continue. Cursors are query-scoped;
+concurrent inserts, updates or deletions can change later pages, so pagination
+does not promise a frozen snapshot. `get_raw` returns recoverable JSON/metadata
+without decoding an unknown registered type or payload version.
+
+The database schema has its own version, separate from payload versions. Unknown
+or nonempty unversioned databases fail safely. Use the connection on its opening
+thread; a context manager closes it even after caller failure. Lock waiting is
+bounded by `timeout` (default 5 seconds, allowed 0–60). No path is chosen by
+default. Parent directories must already exist. Importing never opens a database.
+
+Run `python examples/persistence.py` for a complete offline file-backed Note and
+synthetic ProjectItem round trip, including filtering and deletion.
 
 ## Development
 
