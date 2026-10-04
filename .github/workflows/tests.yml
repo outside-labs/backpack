@@ -39,8 +39,22 @@ jobs:
       - name: Inspect and install the wheel
         run: |
           python -c "import pathlib, subprocess, sys; wheels = list(pathlib.Path('dist').glob('*.whl')); assert len(wheels) == 1; subprocess.run([sys.executable, '-m', 'pip', 'install', str(wheels[0])], check=True)"
-          python -c "import importlib.metadata as m; import backpack_store; d = m.distribution('outside-labs-backpack'); assert d.metadata['Requires-Python'] == '>=3.11'; assert not d.requires; assert d.metadata['License-Expression'] == 'MIT'; assert backpack_store.__name__ == 'backpack_store'"
+          python -c "import importlib.metadata as m; import backpack_store; d = m.distribution('outside-labs-backpack'); assert d.metadata['Requires-Python'] == '>=3.11'; assert all('extra ==' in r for r in (d.requires or [])); assert d.metadata['License-Expression'] == 'MIT'; assert backpack_store.__name__ == 'backpack_store'"
       - name: Run standard-library behavior tests
         run: python -m unittest discover -s tests -v
       - name: Verify file-backed persistence example
         run: python examples/persistence.py
+      - name: Checkout tested capability packages
+        uses: actions/checkout@v4
+        with:
+          repository: outside-labs/hidden_moves
+          ref: c3a2d9c808ee62a88970f7be7ca970c1dd539911
+          path: .dependencies/hidden_moves
+      - name: Build and install optional integration wheels
+        run: |
+          uv build .dependencies/hidden_moves --out-dir integration-dist
+          uv build .dependencies/hidden_moves/packages/hidden-moves-mcp --out-dir integration-dist
+          uv build .dependencies/hidden_moves/packages/hidden-moves-openai --out-dir integration-dist
+          python -c "import pathlib, subprocess, sys; wheels = sorted(str(p) for p in pathlib.Path('integration-dist').glob('*.whl')); subprocess.run([sys.executable, '-m', 'pip', 'install', *wheels], check=True)"
+      - name: Verify optional provider and real local MCP
+        run: python -m unittest discover -s integration_tests -v

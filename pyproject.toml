@@ -18,6 +18,13 @@ classifiers = [
 ]
 dependencies = []
 
+[project.optional-dependencies]
+moves = ["hidden-moves>=0.1,<0.2"]
+host = ["hidden-moves>=0.1,<0.2", "hidden-moves-mcp>=0.1,<0.2"]
+
+[project.entry-points."hidden_moves.moves"]
+backpack = "backpack_store.integration:provide_moves"
+
 [project.urls]
 Homepage = "https://github.com/outside-labs/backpack"
 Repository = "https://github.com/outside-labs/backpack"
