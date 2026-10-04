@@ -88,6 +88,41 @@ default. Parent directories must already exist. Importing never opens a database
 Run `python examples/persistence.py` for a complete offline file-backed Note and
 synthetic ProjectItem round trip, including filtering and deletion.
 
+## Version evolution and export
+
+Register the current codec, then explicit trusted functions for every one-version
+step from an older payload to the current version:
+
+```python
+store.register(DataclassCodec(NoteV2, type_key="notes.note", schema_version=2))
+store.register_migration("notes.note", from_version=1, to_version=2,
+                         migrate=lambda old: {"title": old["title"], "text": old["body"]})
+```
+
+`NoteV2` is an application-defined dataclass with `title` and `text` fields. Old
+reads upgrade in memory; `.payload` and `.schema_version` on the returned envelope
+still describe the original stored representation. Only an explicit
+revision-checked `update` writes the current representation. Missing migration
+steps and newer unknown versions raise `UnknownVersionError`; failed/invalid
+migration output raises `MigrationError`. Migration functions never come from a
+stored module name. Database schema version 1 is independent; no destructive
+migration or automatic database replacement is provided.
+
+```python
+page = store.export_jsonl("records-1.jsonl", limit=100, max_bytes=4_194_304)
+# If page.next_cursor is set, export to another new explicit destination:
+# store.export_jsonl("records-2.jsonl", cursor=page.next_cursor, limit=100)
+```
+
+Export writes UTF-8 JSONL containing raw record envelopes with `format_version: 1`,
+type/payload versions and provenance. No codec or migration runs during export.
+It stops at the record or byte budget (default 1,000 records / 4 MiB; maximum
+1,000 / 64 MiB). If a single record exceeds the byte budget, it fails before
+creating a destination. Pages use ascending UUIDs and the same concurrent-write
+limitations as `find`. A complete temporary file is published without overwriting
+an existing path; the destination directory must exist and support hard links.
+Export never rewrites the database.
+
 ## Development
 
 ```sh

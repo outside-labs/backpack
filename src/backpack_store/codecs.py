@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import types
+from collections.abc import Callable
 from dataclasses import dataclass, fields, is_dataclass
 from typing import (
     Generic,
@@ -18,6 +19,7 @@ from typing import (
 
 from .errors import (
     CodecError,
+    MigrationError,
     RegistrationError,
     UnknownTypeError,
     UnknownVersionError,
@@ -149,8 +151,13 @@ def _convert(annotation: object, value: object, *, decode: bool, path: str) -> o
     raise invalid()
 
 
+@dataclass(frozen=True, init=False)
 class DataclassCodec(Generic[T]):
     """Finite JSON for concrete dataclasses, nested dataclasses and typed containers."""
+
+    model_type: type[T]
+    type_key: str
+    schema_version: int
 
     def __init__(self, model_type: type[T], *, type_key: str, schema_version: int = 1):
         if not isinstance(model_type, type) or not is_dataclass(model_type):
@@ -163,9 +170,9 @@ class DataclassCodec(Generic[T]):
             raise RegistrationError(
                 "dataclass annotations could not be resolved"
             ) from exc
-        self.model_type = model_type
-        self.type_key = type_key
-        self.schema_version = schema_version
+        object.__setattr__(self, "model_type", model_type)
+        object.__setattr__(self, "type_key", type_key)
+        object.__setattr__(self, "schema_version", schema_version)
 
     def encode(self, value: T) -> JSONObject:
         return json_object(
@@ -189,6 +196,7 @@ class CodecRegistry:
     def __init__(self) -> None:
         self._by_key: dict[str, Codec] = {}
         self._by_type: dict[type, Codec] = {}
+        self._migrations: dict[tuple[str, int], Callable[[JSONObject], JSONObject]] = {}
 
     def register(self, codec: Codec[T]) -> None:
         try:
@@ -242,15 +250,65 @@ class CodecRegistry:
             raise CodecError("registered codec failed to encode the value") from exc
         return EncodedValue(codec.type_key, codec.schema_version, payload)
 
+    def register_migration(
+        self,
+        type_key: str,
+        *,
+        from_version: int,
+        to_version: int,
+        migrate: Callable[[JSONObject], JSONObject],
+    ) -> None:
+        codec = self.for_key(type_key)
+        try:
+            positive_integer(from_version, "from_version")
+            positive_integer(to_version, "to_version")
+        except ValidationError as exc:
+            raise RegistrationError(
+                "migration versions must be positive integers"
+            ) from exc
+        if (
+            to_version != from_version + 1
+            or to_version > codec.schema_version
+            or not callable(migrate)
+        ):
+            raise RegistrationError(
+                "migration must advance one version toward the registered codec"
+            )
+        key = (type_key, from_version)
+        if key in self._migrations:
+            raise RegistrationError(
+                "migration from this payload version is already registered"
+            )
+        self._migrations[key] = migrate
+
+    def _upgrade(self, type_key: str, version: int, payload: JSONObject) -> JSONObject:
+        codec = self.for_key(type_key)
+        positive_integer(version, "schema_version")
+        if version > codec.schema_version:
+            raise UnknownVersionError(
+                "stored payload is newer than the registered codec"
+            )
+        current = json_object(payload)
+        while version < codec.schema_version:
+            migrate = self._migrations.get((type_key, version))
+            if migrate is None:
+                raise UnknownVersionError(
+                    "register every explicit payload migration to the current version"
+                )
+            try:
+                current = json_object(migrate(current))
+            except Exception:  # noqa: BLE001 - sanitize trusted migration failures and reject invalid JSON
+                raise MigrationError(
+                    "registered payload migration failed validation or execution"
+                ) from None
+            version += 1
+        return current
+
     def decode(self, type_key: str, schema_version: int, payload: JSONObject) -> object:
         codec = self.for_key(type_key)
-        positive_integer(schema_version, "schema_version")
-        if schema_version != codec.schema_version:
-            raise UnknownVersionError(
-                "register an explicit migration for this payload schema version"
-            )
+        payload = self._upgrade(type_key, schema_version, payload)
         try:
-            value = codec.decode(json_object(payload))
+            value = codec.decode(payload)
         except (ValidationError, CodecError):
             raise
         except Exception as exc:  # noqa: BLE001 - custom codec messages may contain record data
