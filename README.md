@@ -166,6 +166,37 @@ These are local tools. No public endpoint or remote access to the SQLite file is
 provided. Run `python -m unittest discover -s integration_tests -v` in the optional
 integration environment to check real stdio, selection and consumer equivalence.
 
+## Optional Pydantic model codec
+
+Install the `pydantic` extra to use the separate Pydantic 2 extension (supported
+range `>=2.13,<3`; tested with 2.13.5). Importing the core never imports Pydantic.
+The extension uses the same store, explicit identity and migration registry:
+
+```python
+from pydantic import BaseModel
+from backpack_store.pydantic_codec import PydanticCodec
+
+class ValidatedNote(BaseModel):
+    title: str
+    priority: int
+
+store.register(PydanticCodec(ValidatedNote, type_key="notes.validated", schema_version=1))
+written = store.put(ValidatedNote(title="Example", priority=2))
+```
+
+Register the same trusted model after reopening. The codec accepts the exact
+registered class, serializes aliases and JSON representations, then revalidates
+strictly before writing. Decode also uses strict JSON validation with extra fields
+forbidden. This catches mutated instances and `model_construct` bypasses instead
+of trusting an already-created instance. Payloads still obey the core finite JSON
+object limits. Object-shaped nested models and datetime JSON round trips are
+covered; scalar/list `RootModel` classes are rejected. Private/computed fields are
+not part of the durable representation.
+
+This codec does not add native Pydantic type support to tool signatures. The
+optional provider continues to use its concrete JSON views. Run
+`python -m unittest discover -s pydantic_tests -v` in the extension environment.
+
 ## Development
 
 ```sh
