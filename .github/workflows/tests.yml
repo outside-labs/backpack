@@ -42,3 +42,5 @@ jobs:
           python -c "import importlib.metadata as m; import backpack_store; d = m.distribution('outside-labs-backpack'); assert d.metadata['Requires-Python'] == '>=3.11'; assert not d.requires; assert d.metadata['License-Expression'] == 'MIT'; assert backpack_store.__name__ == 'backpack_store'"
       - name: Run standard-library behavior tests
         run: python -m unittest discover -s tests -v
+      - name: Verify file-backed persistence example
+        run: python examples/persistence.py
