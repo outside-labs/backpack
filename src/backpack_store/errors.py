@@ -47,3 +47,7 @@ class DatabaseVersionError(StorageError):
 
 class InvalidCursorError(ValidationError):
     """A find cursor is malformed or belongs to a different query."""
+
+
+class MigrationError(CodecError):
+    """An explicitly registered payload migration failed."""

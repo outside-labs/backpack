@@ -6,6 +6,7 @@ from .errors import (
     CodecError,
     DatabaseVersionError,
     InvalidCursorError,
+    MigrationError,
     NotFoundError,
     RegistrationError,
     RevisionConflictError,
@@ -16,10 +17,12 @@ from .errors import (
     ValidationError,
 )
 from .records import JSONObject, JSONValue, Provenance, RawRecord, Record
-from .store import Backpack, FindPage, WriteResult
+from .store import Backpack, ExportResult, FindPage, WriteResult
 
 __all__ = [
     "Backpack",
+    "ExportResult",
+    "MigrationError",
     "FindPage",
     "WriteResult",
     "BackpackError",

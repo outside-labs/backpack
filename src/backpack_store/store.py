@@ -8,9 +8,11 @@ import json
 import math
 import os
 import sqlite3
-from collections.abc import Iterable, Iterator
+import tempfile
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Generic, TypeVar
 from uuid import uuid4
 
@@ -25,6 +27,7 @@ from .errors import (
     ValidationError,
 )
 from .records import (
+    JSONObject,
     Provenance,
     RawRecord,
     Record,
@@ -63,6 +66,13 @@ class WriteResult:
 class FindPage(Generic[T]):
     records: tuple[Record[T], ...]
     next_cursor: str | None
+
+
+@dataclass(frozen=True)
+class ExportResult:
+    count: int
+    next_cursor: str | None
+    bytes_written: int
 
 
 def _dump(value: object) -> str:
@@ -411,6 +421,85 @@ class Backpack:
                 ).rowcount
                 == 1
             )
+
+    def register_migration(
+        self,
+        type_key: str,
+        *,
+        from_version: int,
+        to_version: int,
+        migrate: Callable[[JSONObject], JSONObject],
+    ) -> None:
+        """Register a trusted one-version payload upgrade; never rewrite on read."""
+        self._live_connection()
+        self._registry.register_migration(
+            type_key, from_version=from_version, to_version=to_version, migrate=migrate
+        )
+
+    def export_jsonl(
+        self,
+        destination: str | os.PathLike[str],
+        *,
+        limit: int = 1000,
+        cursor: str | None = None,
+        max_bytes: int = 4_194_304,
+    ) -> ExportResult:
+        """Export one raw-record page to a new explicit file without decoding."""
+        self._live_connection()
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise ValidationError("limit must be an integer between 1 and 1000")
+        if type(max_bytes) is not int or not 1024 <= max_bytes <= 67_108_864:
+            raise ValidationError("max_bytes must be between 1 KiB and 64 MiB")
+        try:
+            target = Path(destination)
+        except TypeError as exc:
+            raise ValidationError("an explicit export destination is required") from exc
+        last_id = "" if cursor is None else _read_cursor(cursor, "*", ())
+        lines: list[bytes] = []
+        total_bytes, next_cursor = 0, None
+        with self._transaction() as connection:
+            rows = connection.execute(
+                "SELECT * FROM records WHERE id > ? ORDER BY id LIMIT ?",
+                (last_id, limit + 1),
+            )
+            for row in rows:
+                if len(lines) == limit:
+                    next_cursor = _cursor("*", (), last_id)
+                    break
+                record = self._raw_from_row(connection, row)
+                line = (_dump({"format_version": 1, **asdict(record)}) + "\n").encode(
+                    "utf-8"
+                )
+                if total_bytes + len(line) > max_bytes:
+                    if not lines:
+                        raise ValidationError(
+                            "one record exceeds max_bytes; increase the explicit export budget"
+                        )
+                    next_cursor = _cursor("*", (), last_id)
+                    break
+                lines.append(line)
+                total_bytes += len(line)
+                last_id = record.id
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=target.parent, prefix=".backpack-export-", delete=False
+            ) as output:
+                temporary = Path(output.name)
+                for line in lines:
+                    output.write(line)
+                output.flush()
+                os.fsync(output.fileno())
+            # A hard link publishes a complete file and refuses to overwrite any existing path.
+            os.link(temporary, target)
+        except (OSError, ValueError):
+            raise StorageError(
+                "export destination must be a new writable file in an existing directory"
+            ) from None
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        return ExportResult(len(lines), next_cursor, total_bytes)
 
     def close(self) -> None:
         if self._connection is not None:
