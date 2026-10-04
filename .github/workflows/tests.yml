@@ -40,3 +40,5 @@ jobs:
         run: |
           python -c "import pathlib, subprocess, sys; wheels = list(pathlib.Path('dist').glob('*.whl')); assert len(wheels) == 1; subprocess.run([sys.executable, '-m', 'pip', 'install', str(wheels[0])], check=True)"
           python -c "import importlib.metadata as m; import backpack_store; d = m.distribution('outside-labs-backpack'); assert d.metadata['Requires-Python'] == '>=3.11'; assert not d.requires; assert d.metadata['License-Expression'] == 'MIT'; assert backpack_store.__name__ == 'backpack_store'"
+      - name: Run standard-library behavior tests
+        run: python -m unittest discover -s tests -v
