@@ -1,17 +1,32 @@
 [project]
-name = "backpack"
+name = "outside-labs-backpack"
 version = "0.1.0"
-description = "Add your description here"
+description = "Store and retrieve typed local records with identity and provenance."
 readme = "README.md"
-authors = [
-    { name = "ellainng", email = "299958882+ellainng@users.noreply.github.com" }
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Ella Inng" }]
+maintainers = [{ name = "Outside Labs" }]
+keywords = ["typed-storage", "sqlite", "records", "provenance", "local-first"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.14"
 dependencies = []
 
-[project.scripts]
-backpack = "backpack:main"
+[project.urls]
+Homepage = "https://github.com/outside-labs/backpack"
+Repository = "https://github.com/outside-labs/backpack"
+Issues = "https://github.com/outside-labs/backpack/issues"
+Documentation = "https://github.com/outside-labs/backpack#readme"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "backpack_store"

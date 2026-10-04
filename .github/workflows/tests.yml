@@ -1,0 +1,42 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: '3.11'
+          - os: ubuntu-latest
+            python-version: '3.13'
+          - os: macos-latest
+            python-version: '3.13'
+          - os: windows-latest
+            python-version: '3.11'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build wheel from source distribution
+        run: |
+          python -m pip install uv
+          uv build --out-dir dist
+      - name: Inspect and install the wheel
+        run: |
+          python -c "import pathlib, subprocess, sys; wheels = list(pathlib.Path('dist').glob('*.whl')); assert len(wheels) == 1; subprocess.run([sys.executable, '-m', 'pip', 'install', str(wheels[0])], check=True)"
+          python -c "import importlib.metadata as m; import backpack_store; d = m.distribution('outside-labs-backpack'); assert d.metadata['Requires-Python'] == '>=3.11'; assert not d.requires; assert d.metadata['License-Expression'] == 'MIT'; assert backpack_store.__name__ == 'backpack_store'"
