@@ -123,6 +123,49 @@ limitations as `find`. A complete temporary file is published without overwritin
 an existing path; the destination directory must exist and support hard links.
 Export never rewrites the database.
 
+## Optional selected tools
+
+The direct store remains independent of Hidden Moves and MCP. Optional `moves`
+and `host` extras declare the capability-family dependencies; those distributions
+are currently installed from their source-built wheels. CI uses a reviewed pinned
+family revision, runs standalone storage first, then installs the optional wheels.
+
+Installed entry-point discovery advertises `backpack`; load it explicitly and bind
+an already-configured Backpack instance. The factory chooses no path and opens no
+database. The application registers trusted models before selecting tools:
+
+```python
+from backpack_store.host import build_catalog
+from backpack_store.integration import READ_CAPABILITIES, WRITE_CAPABILITIES
+
+read = build_catalog(store, READ_CAPABILITIES)
+result = read.invoke("backpack.records.find", {"type_key": "notes.note", "limit": 10})
+write = build_catalog(store, WRITE_CAPABILITIES, allow_writes=True)
+```
+
+Read tools are `backpack.records.get` and `.find`; local write tools are `.put` and
+`.delete`. A write profile requires explicit host intent and explicit selection.
+Inputs contain local IDs, registered stable type keys and finite JSON payloads,
+never Python classes, codec imports, SQL or database paths. `put` validates the
+current registered model; `find` enforces the storage query limits. Concrete JSON
+views preserve record identity/version/provenance without serializing arbitrary
+Python objects. Effect annotations describe local reads/insertion/deletion;
+application permissions and caller approval policy remain responsible for access.
+
+`serve_store(store, names, allow_writes=False)` serves the same catalog over local
+MCP stdio. The application owns the connection and cleanup. For a complete notes
+application with a fixed trusted model and explicit path/profile:
+
+```sh
+python examples/notes_stdio.py --database notes.sqlite --profile read
+# Select a write-capable host only when local writes are intended:
+python examples/notes_stdio.py --database notes.sqlite --profile write
+```
+
+These are local tools. No public endpoint or remote access to the SQLite file is
+provided. Run `python -m unittest discover -s integration_tests -v` in the optional
+integration environment to check real stdio, selection and consumer equivalence.
+
 ## Development
 
 ```sh
