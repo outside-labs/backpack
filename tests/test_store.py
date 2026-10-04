@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 from uuid import uuid4
 
@@ -143,7 +144,7 @@ class StoreTests(unittest.TestCase):
             )
 
     def test_database_failure_rolls_back_payload_metadata_and_tags(self):
-        with sqlite3.connect(self.path) as connection:
+        with closing(sqlite3.connect(self.path)) as connection, connection:
             connection.execute(
                 "CREATE TRIGGER fail_tag BEFORE INSERT ON tags WHEN NEW.tag = 'fail' BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END"
             )
@@ -182,7 +183,7 @@ class StoreTests(unittest.TestCase):
         write = self.store.put(Note("a", "b"), tags=["work"])
         self.assertTrue(self.store.delete(write.id))
         self.assertFalse(self.store.delete(write.id))
-        with sqlite3.connect(self.path) as connection:
+        with closing(sqlite3.connect(self.path)) as connection, connection:
             self.assertEqual(
                 connection.execute("SELECT COUNT(*) FROM tags").fetchone()[0], 0
             )
@@ -191,7 +192,7 @@ class StoreTests(unittest.TestCase):
 
     def test_unknown_payload_version_is_recoverable_without_decoding(self):
         write = self.store.put(Note("a", "b"))
-        with sqlite3.connect(self.path) as connection:
+        with closing(sqlite3.connect(self.path)) as connection, connection:
             connection.execute(
                 "UPDATE records SET schema_version = 2 WHERE id = ?", (write.id,)
             )
@@ -216,7 +217,7 @@ class StoreTests(unittest.TestCase):
     def test_lock_timeout_is_bounded_and_failure_leaves_no_rows(self):
         with Backpack.open(self.path, timeout=0) as short:
             register(short)
-            with sqlite3.connect(self.path) as blocker:
+            with closing(sqlite3.connect(self.path)) as blocker, blocker:
                 blocker.execute("BEGIN IMMEDIATE")
                 with self.assertRaises(StorageError):
                     short.put(Note("blocked", "text"))
