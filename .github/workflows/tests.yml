@@ -58,3 +58,5 @@ jobs:
           python -c "import pathlib, subprocess, sys; wheels = sorted(str(p) for p in pathlib.Path('integration-dist').glob('*.whl')); subprocess.run([sys.executable, '-m', 'pip', 'install', *wheels], check=True)"
       - name: Verify optional provider and real local MCP
         run: python -m unittest discover -s integration_tests -v
+      - name: Verify optional Pydantic model codec
+        run: python -m unittest discover -s pydantic_tests -v
