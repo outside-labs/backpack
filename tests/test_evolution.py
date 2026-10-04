@@ -74,7 +74,7 @@ class EvolutionTests(unittest.TestCase):
             self.assertIs(type(record.value), NoteV2)
             output = self.root / "old-record.jsonl"
             store.export_jsonl(output)
-            exported = json.loads(output.read_text())
+            exported = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(exported["schema_version"], 1)
             self.assertEqual(exported["payload"], before.payload)
             self.assertEqual(store.get_raw(write.id), before)
@@ -203,7 +203,7 @@ class EvolutionTests(unittest.TestCase):
             for name in ("first.jsonl", "second.jsonl"):
                 actual.extend(
                     json.loads(line)["id"]
-                    for line in (self.root / name).read_text().splitlines()
+                    for line in (self.root / name).read_text(encoding="utf-8").splitlines()
                 )
             self.assertEqual(actual, expected)
 
@@ -218,7 +218,7 @@ class EvolutionTests(unittest.TestCase):
             target.write_text("preserve")
             with self.assertRaises(StorageError):
                 store.export_jsonl(target)
-            self.assertEqual(target.read_text(), "preserve")
+            self.assertEqual(target.read_text(encoding="utf-8"), "preserve")
             with self.assertRaises(StorageError):
                 store.export_jsonl(self.root / "missing" / "file.jsonl")
             self.assertEqual(list(self.root.glob(".backpack-export-*")), [])
