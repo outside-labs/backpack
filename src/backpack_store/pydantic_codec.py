@@ -12,7 +12,7 @@ try:
     from pydantic import __version__ as pydantic_version
 except ImportError:
     raise ImportError(
-        "Install outside-labs-backpack with its [pydantic] extra to use this codec."
+        "Install backpack-store with its [pydantic] extra to use this codec."
     ) from None
 
 from .errors import CodecError, RegistrationError, ValidationError

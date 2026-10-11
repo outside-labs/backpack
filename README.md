@@ -5,10 +5,19 @@ SQLite API stores finite JSON with explicit codecs, local identity and provenanc
 Records recover their Python types after closing and reopening the database.
 
 - Product: Backpack
-- Distribution: `outside-labs-backpack`
+- Distribution: `backpack-store`
 - Import: `backpack_store`
 - Python: 3.11 or newer
 - Runtime dependencies: none
+
+## Installation
+
+```sh
+python -m pip install backpack-store==0.1.0
+```
+
+Optional extras are `backpack-store[pydantic]`, `backpack-store[moves]` and
+`backpack-store[host]`. The `backpack_store` import stays the same for every extra.
 
 ## Explicit typed records
 
@@ -126,9 +135,9 @@ Export never rewrites the database.
 ## Optional selected tools
 
 The direct store remains independent of Hidden Moves and MCP. Optional `moves`
-and `host` extras declare the capability-family dependencies; those distributions
-are currently installed from their source-built wheels. CI uses a reviewed pinned
-family revision, runs standalone storage first, then installs the optional wheels.
+and `host` extras declare the capability-family dependencies. CI uses a reviewed
+pinned family revision, runs standalone storage first, then installs the optional
+wheels.
 
 Installed entry-point discovery advertises `backpack`; load it explicitly and bind
 an already-configured Backpack instance. The factory chooses no path and opens no
@@ -201,7 +210,7 @@ optional provider continues to use its concrete JSON views. Run
 
 ```sh
 uv build
-python -m pip install dist/outside_labs_backpack-0.1.0-py3-none-any.whl
+python -m pip install dist/backpack_store-0.1.0-py3-none-any.whl
 python -m unittest discover -s tests -v
 ```
 
@@ -209,5 +218,7 @@ CI installs the wheel built from its source distribution and runs the behavior
 suite on Python 3.11/3.13 across Linux, macOS and Windows. The original generated
 scaffold is preserved in the repository's initial commit.
 
-This 0.1.x project is experimental. No package publication or hosted service is
-part of this milestone.
+This 0.1.x project is experimental. Published GitHub releases with matching `v`
+tags run `.github/workflows/release.yaml`, verify the installed wheel and source
+distribution, and upload through PyPI trusted publishing in environment `pypi`.
+The initial release tag is `v0.1.0`.

@@ -1,0 +1,85 @@
+name: Publish Backpack to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backpack-pypi-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify Backpack distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify release tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import os, tomllib
+          from pathlib import Path
+          project = tomllib.loads(Path('pyproject.toml').read_text())['project']
+          assert project['name'] == 'backpack-store'
+          assert os.environ['RELEASE_TAG'] == 'v' + project['version'], 'Tag must match the package version'
+          assert project['dependencies'] == [], 'The ordinary store must have no runtime dependencies'
+          PY
+      - name: Install build tools
+        run: python -m pip install 'uv==0.12.19' twine
+      - name: Build wheel and source distribution
+        run: uv build --out-dir dist
+      - name: Check distribution metadata
+        run: python -m twine check --strict dist/*
+      - name: Verify installed Backpack wheel
+        shell: bash
+        run: |
+          test_venv="${RUNNER_TEMP}/backpack-wheel"
+          uv venv "$test_venv" --python 3.13
+          uv pip install --python "$test_venv/bin/python" dist/*.whl
+          uv pip check --python "$test_venv/bin/python"
+          "$test_venv/bin/python" -I - <<'PY'
+          from importlib.metadata import distribution
+          import backpack_store
+          project = distribution('backpack-store')
+          assert project.version == '0.1.0'
+          assert project.metadata['Requires-Python'] == '>=3.11'
+          assert project.metadata['License-Expression'] == 'MIT'
+          assert all('extra ==' in requirement for requirement in (project.requires or []))
+          assert backpack_store.__name__ == 'backpack_store'
+          PY
+          "$test_venv/bin/python" -m unittest discover -s tests -v
+          "$test_venv/bin/python" examples/persistence.py
+      - uses: actions/upload-artifact@v5
+        with:
+          name: backpack-store-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish Backpack distribution to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/backpack-store/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: backpack-store-distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

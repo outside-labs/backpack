@@ -39,7 +39,7 @@ jobs:
       - name: Inspect and install the wheel
         run: |
           python -c "import pathlib, subprocess, sys; wheels = list(pathlib.Path('dist').glob('*.whl')); assert len(wheels) == 1; subprocess.run([sys.executable, '-m', 'pip', 'install', str(wheels[0])], check=True)"
-          python -c "import importlib.metadata as m; import backpack_store; d = m.distribution('outside-labs-backpack'); assert d.metadata['Requires-Python'] == '>=3.11'; assert all('extra ==' in r for r in (d.requires or [])); assert d.metadata['License-Expression'] == 'MIT'; assert backpack_store.__name__ == 'backpack_store'"
+          python -c "import importlib.metadata as m; import backpack_store; d = m.distribution('backpack-store'); assert d.metadata['Requires-Python'] == '>=3.11'; assert all('extra ==' in r for r in (d.requires or [])); assert d.metadata['License-Expression'] == 'MIT'; assert backpack_store.__name__ == 'backpack_store'"
       - name: Run standard-library behavior tests
         run: python -m unittest discover -s tests -v
       - name: Verify file-backed persistence example
