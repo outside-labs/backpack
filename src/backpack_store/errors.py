@@ -49,6 +49,10 @@ class StoreClosedError(StorageError):
     """The owned database connection has already been closed."""
 
 
+class TransactionError(StorageError):
+    """A unit of work or transform violated its transaction contract."""
+
+
 class DatabaseVersionError(StorageError):
     """This database schema version is not supported."""
 

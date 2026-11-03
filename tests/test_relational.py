@@ -41,7 +41,7 @@ def register(store, codec_type=DataclassCodec):
     return projects, items
 
 
-class RelationalTests(unittest.TestCase):
+class ApplicationFixture:
     def setUp(self):
         self.directory = TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
@@ -51,6 +51,8 @@ class RelationalTests(unittest.TestCase):
         self.projects, self.items = register(self.store)
         self.store.initialize("garden")
 
+
+class RelationalTests(ApplicationFixture, unittest.TestCase):
     def test_create_reopen_detachment_and_legacy_records(self):
         value = WorkItem("item-01", "Garden", estimate=1.5)
         row = self.items.create(value)
