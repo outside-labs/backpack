@@ -24,12 +24,16 @@ from .records import JSONObject, JSONValue, Provenance, RawRecord, Record
 from .store import Backpack, ExportResult, FindPage, WriteResult
 from .relational import ApplicationModel, ApplicationRow, ApplicationStore, ForeignKey, Index
 from .async_store import AsyncApplicationStore, DispatchedCancellation, OperationReceipt
+from .queries import ApplicationPage, Filter, Order
 
 __all__ = [
     "AlreadyExistsError",
     "ApplicationModel",
     "ApplicationRow",
     "ApplicationStore",
+    "ApplicationPage",
+    "Filter",
+    "Order",
     "AsyncApplicationStore",
     "DispatchedCancellation",
     "OperationReceipt",

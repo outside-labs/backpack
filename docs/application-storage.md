@@ -52,9 +52,42 @@ and release any uncommitted reservation. Successful deletion retains the key
 reservation permanently, preventing stale clients from modifying a recreated
 resource. Errors omit submitted values and SQL.
 
-`list(limit=1..1000, after=key)` provides bounded primary-key traversal. Typed
-filters and query-bound cursors are owned by BP-QUERY-01; upgrades remain in
-their subsequent task.
+`list(limit=1..1000, after=key)` provides bounded primary-key traversal.
+
+## Typed queries
+
+```python
+from backpack_store import Filter, Order
+
+page = items.find(filters=[Filter("done", "eq", False)],
+                  order=[Order("title")], limit=50)
+next_page = items.find(filters=[Filter("done", "eq", False)],
+                       order=[Order("title")], limit=50,
+                       cursor=page.next_cursor) if page.next_cursor else None
+```
+
+`find` returns an `ApplicationPage` with detached `rows` and `next_cursor`.
+It admits at most 16 ANDed predicates: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `in`
+and `is_null`. Values retain their exact declared scalar types; `in` accepts
+1–100 non-null values and `is_null` requires an exact bool. Bool fields admit
+equality/membership, with no ordered comparisons. Other comparisons exclude
+NULL according to SQL semantics. Unknown fields/operators, unbounded requests
+and raw SQL are refused before query execution.
+
+Pages contain 1–1000 rows (default 50). At most three explicit `Order` fields
+are allowed; NULL always sorts last, and the primary key is appended ascending
+unless already present. Strings use binary comparison. Cursor continuation is
+keyset-based, bound to namespace/model/schema and canonical predicates/order.
+Changing page size is allowed. Malformed, obsolete or wrong-query cursors raise
+`InvalidCursorError`. Cursors are limited to 16 KiB; a sort tuple too large to
+produce a continuation raises `ValidationError`. Prefer short order fields.
+
+Stable data traverses once; concurrent insertion, deletion or changed sort
+values may omit/repeat rows. Pages are fresh reads, not a snapshot lease.
+Cursors are neither authorization nor encrypted data; reapply access policy
+for every page and keep cursor values out of logs. Declared indexes are
+created/validated at initialization; the acceptance suite checks the real
+filter query's plan without promising an index-only plan for every query.
 
 ## Atomic updates and units of work
 
