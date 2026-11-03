@@ -15,6 +15,7 @@ concurrency:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -44,6 +45,8 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Check adopted relational SQL reference examples
         run: python -m unittest discover -s conformance_tests -v
+      - name: Qualify owned SQLite behavior across real processes
+        run: python -m unittest discover -s process_tests -v
       - name: Verify file-backed persistence example
         run: python examples/persistence.py
       - name: Checkout tested capability packages
@@ -85,3 +88,8 @@ jobs:
         run: |
           python -m unittest discover -s enforce_type_tests -v
           python -m unittest discover -s tests
+      - name: Qualify the preferred application codec across processes
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          BACKPACK_PROCESS_CODEC: enforce-type
+        run: python -m unittest discover -s process_tests -v

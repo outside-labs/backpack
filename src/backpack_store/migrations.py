@@ -209,6 +209,7 @@ def migrate_sqlite(source, *, namespace: str, steps, backup_directory,
     try:
         with closing(sqlite3.connect(path, timeout=timeout)) as connection:
             connection.execute("PRAGMA foreign_keys=ON")
+            connection.execute("PRAGMA synchronous=FULL")
             return _migrate_connection(connection, path, namespace=namespace, steps=steps, history=history,
                                        backup_directory=backup_directory, adopt_history=adopt_history, validate=validate)
     except sqlite3.Error:
