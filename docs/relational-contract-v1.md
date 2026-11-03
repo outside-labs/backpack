@@ -2,7 +2,10 @@
 
 `relational-sqlite/1` is an adopted contract for BP-SQL-02 and subsequent owning
 tasks. The [application store](application-storage.md) implements registered
-scalar schemas and checked CRUD; subsequent tasks add the remaining facilities. Existing
+scalar schemas, checked CRUD, transactions, typed queries and owned async work.
+[Ordered upgrades and snapshots](sqlite-migrations.md) and the
+[qualified one-host profile](sqlite-application-profile.md) complete the selected
+SQLite slice. Existing
 `Backpack` JSON-record APIs, database version 1, UUID identities, payload
 migrations and 32-bit record revisions retain their current behavior. New
 application domain revisions follow the separate
@@ -11,7 +14,8 @@ application domain revisions follow the separate
 Run the [executable SQLite reference examples](../conformance_tests/test_relational_reference.py)
 with `python -m unittest discover -s conformance_tests -v`. These examples prove
 the selected SQL constraints/order/transaction expectations against synthetic
-tables; they are not a substitute for future public-backend conformance tests.
+tables. Public-backend acceptance is in `tests/test_relational.py`, the
+application transaction/query/async/migration suites and `process_tests/`.
 
 ## Registration and schema ownership
 
@@ -83,8 +87,7 @@ Foreign-key deletes use RESTRICT, with no cascades or deferred constraints.
 
 ## Identity, CRUD and detached values
 
-The implementing public model handle will provide these logical operations;
-the owning task may refine Python names while preserving their semantics:
+The registered `ApplicationModel` handle provides these operations:
 
 | Operation | Contract |
 | --- | --- |
@@ -94,8 +97,8 @@ the owning task may refine Python names while preserving their semantics:
 | `delete(key, expected_revision=...)` | Require the expected revision, enforce references and delete the row atomically; retain its permanent key reservation |
 | `find(filters=..., order=..., limit=..., cursor=...)` | Typed bounded page under the query contract below |
 
-Create never overwrites. Duplicate primary/unique keys map to the proposed
-`AlreadyExistsError`; referential violations map to the proposed
+Create never overwrites. Duplicate primary/unique keys map to
+`AlreadyExistsError`; referential violations map to
 `ConstraintError`, both typed `BackpackError` subclasses without submitted
 values/SQL. BP-SQL-02 introduces these errors with implementation. Invalid
 inputs use `ValidationError`, unknown model/schema uses `RegistrationError` or
