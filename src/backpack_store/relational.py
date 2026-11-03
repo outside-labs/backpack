@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, fields, is_dataclass
 import hashlib
+import inspect
 import json
 import math
 import re
@@ -19,7 +20,7 @@ from .codecs import Codec, CodecRegistry
 from .errors import (
     AlreadyExistsError, CodecError, ConstraintError, DatabaseVersionError,
     NotFoundError, RegistrationError, RevisionConflictError, StorageError,
-    ValidationError,
+    TransactionError, ValidationError,
 )
 from .records import json_object, positive_integer, validate_record_id
 from .store import Backpack
@@ -228,9 +229,9 @@ class ApplicationModel(Generic[T]):
         return row
 
     def create(self, value: T) -> ApplicationRow[T]:
-        payload = self._payload(value)
-        key, identity = payload[self._primary_key], str(uuid4())
         with self._store._operation(self, write=True) as connection:
+            payload = self._payload(value)
+            key, identity = payload[self._primary_key], str(uuid4())
             connection.execute("INSERT INTO bp_application_keys VALUES (?,?,?,?)", (self._namespace, self._codec.type_key, key, identity))
             names = ",".join([*(_quote(c.name) for c in self._columns), '"_storage_uuid"', '"_revision"', '"_payload_version"'])
             values = [*(payload[c.field] for c in self._columns), identity, 1, self._codec.schema_version]
@@ -242,18 +243,40 @@ class ApplicationModel(Generic[T]):
             return self._get(connection, key)
 
     def replace(self, key: str, value: T, *, expected_revision: str) -> ApplicationRow[T]:
+        with self._store._operation(self, write=True) as connection:
+            return self._replace(connection, key, value, expected_revision)
+
+    def _replace(self, connection, key, value, expected_revision):
         payload = self._payload(value)
         if payload[self._primary_key] != _key(key):
             raise ValidationError("application domain keys are immutable")
+        row = self._checked(connection, key, expected_revision)
+        if int(row.revision) == MAX_REVISION:
+            raise RevisionConflictError("application revision is exhausted")
+        assignments = ",".join(f"{_quote(c.name)}=?" for c in self._columns)
+        column = _quote(self._by_field[self._primary_key].name)
+        connection.execute(f"UPDATE {_quote(self._table)} SET {assignments},_revision=_revision+1 WHERE {column}=?",
+                           [*(payload[c.field] for c in self._columns), key])
+        return self._get(connection, key)
+
+    def update(self, key: str, *, expected_revision: str, transform: Callable[[T], T]) -> ApplicationRow[T]:
+        """Transform a detached current value while holding the write transaction."""
         with self._store._operation(self, write=True) as connection:
-            row = self._checked(connection, key, expected_revision)
-            if int(row.revision) == MAX_REVISION:
-                raise RevisionConflictError("application revision is exhausted")
-            assignments = ",".join(f"{_quote(c.name)}=?" for c in self._columns)
-            column = _quote(self._by_field[self._primary_key].name)
-            connection.execute(f"UPDATE {_quote(self._table)} SET {assignments},_revision=_revision+1 WHERE {column}=?",
-                               [*(payload[c.field] for c in self._columns), key])
-            return self._get(connection, key)
+            current = self._checked(connection, key, expected_revision)
+            if not callable(transform) or inspect.iscoroutinefunction(transform):
+                raise ValidationError("update requires a synchronous transform")
+            self._store._in_transform = True
+            try:
+                value = transform(current.value)
+                if inspect.isawaitable(value):
+                    if inspect.iscoroutine(value):
+                        value.close()
+                    raise ValidationError("update transforms cannot return awaitables")
+            except Exception:
+                raise TransactionError("application transform failed; its transaction will roll back") from None
+            finally:
+                self._store._in_transform = False
+            return self._replace(connection, key, value, expected_revision)
 
     def delete(self, key: str, *, expected_revision: str) -> None:
         with self._store._operation(self, write=True) as connection:
@@ -280,6 +303,9 @@ class ApplicationStore:
         self._models: dict[tuple[str, str], ApplicationModel] = {}
         self._initialized: set[str] = set()
         self._schemas: dict[str, tuple[int, str]] = {}
+        self._unit_connection: sqlite3.Connection | None = None
+        self._unit_failed = False
+        self._in_transform = False
 
     @classmethod
     def open(cls, path, *, timeout: float = 5.0) -> ApplicationStore:
@@ -393,12 +419,9 @@ class ApplicationStore:
         self._schemas[namespace] = schema_version, signature
 
     @contextmanager
-    def _transaction(self, *, write=False) -> Iterator[sqlite3.Connection]:
-        connection = self._connection()
+    def _database_errors(self):
         try:
-            with connection:
-                connection.execute("BEGIN IMMEDIATE" if write else "BEGIN")
-                yield connection
+            yield
         except sqlite3.IntegrityError as error:
             if error.sqlite_errorcode in (sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY, sqlite3.SQLITE_CONSTRAINT_UNIQUE):
                 raise AlreadyExistsError("domain key is reserved or unique value already exists") from None
@@ -407,15 +430,53 @@ class ApplicationStore:
             raise StorageError("application SQLite operation failed and rolled back") from None
 
     @contextmanager
+    def _transaction(self, *, write=False) -> Iterator[sqlite3.Connection]:
+        connection = self._connection()
+        if connection.in_transaction or self._in_transform:
+            raise TransactionError("nested transaction owners are not supported")
+        with self._database_errors(), connection:
+            connection.execute("BEGIN IMMEDIATE" if write else "BEGIN")
+            yield connection
+
+    @contextmanager
+    def unit_of_work(self) -> Iterator[ApplicationStore]:
+        """Enlist this store's model operations in one non-nestable write transaction."""
+        with self._transaction(write=True) as connection:
+            self._unit_connection = connection
+            self._unit_failed = False
+            try:
+                yield self
+                if self._unit_failed:
+                    raise TransactionError("unit of work contains a failed operation and must roll back")
+            finally:
+                self._unit_connection = None
+                self._unit_failed = False
+
+    @contextmanager
     def _operation(self, model, *, write=False):
+        self._connection()
+        if self._in_transform:
+            raise TransactionError("transforms cannot recursively invoke storage operations")
         if model._namespace not in self._initialized:
             raise RegistrationError("initialize the registered namespace before accessing rows")
-        with self._transaction(write=write) as connection:
-            yield connection
+        if self._unit_connection is None:
+            with self._transaction(write=write) as connection:
+                yield connection
+        else:
+            try:
+                if self._unit_failed:
+                    raise TransactionError("unit of work is already marked for rollback")
+                with self._database_errors():
+                    yield self._unit_connection
+            except BaseException:
+                self._unit_failed = True
+                raise
 
     def close(self) -> None:
         if threading.get_ident() != self._owner:
             raise StorageError("application connection must stay on its owning thread")
+        if self._unit_connection is not None or self._in_transform:
+            raise TransactionError("finish the active transaction before closing storage")
         self._records.close()
 
     def __enter__(self):

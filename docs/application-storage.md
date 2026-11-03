@@ -53,5 +53,35 @@ reservation permanently, preventing stale clients from modifying a recreated
 resource. Errors omit submitted values and SQL.
 
 `list(limit=1..1000, after=key)` provides bounded primary-key traversal. Typed
-filters and query-bound cursors are owned by BP-QUERY-01; transaction units,
-async ownership and upgrades remain in their subsequent tasks.
+filters and query-bound cursors are owned by BP-QUERY-01; async ownership and
+upgrades remain in their subsequent tasks.
+
+## Atomic updates and units of work
+
+`items.update(key, expected_revision=revision, transform=callback)` reads and
+checks the current row inside the write transaction, passes a detached model to
+a synchronous callback, validates its result and replaces the row exactly once.
+Missing/stale rows do not run the callback. Callback failures raise a value-free
+`TransactionError`; invalid returned models raise `ValidationError`.
+
+```python
+from dataclasses import replace
+
+with store.unit_of_work():
+    project = projects.create(Project("garden", "Garden"))
+    item = items.create(WorkItem("item-002", "Plan", project_key=project.key))
+    items.update(item.key, expected_revision=item.revision,
+                 transform=lambda value: replace(value, done=True))
+```
+
+All operations on this store's registered handles enlist in the same
+`BEGIN IMMEDIATE` transaction. Returned rows inside the block are provisional
+until successful context exit. A failed enlisted operation marks the entire
+unit for rollback, even if the application catches its exception. Rollback
+also releases newly reserved keys. Closing an active unit, nested units and
+savepoints are refused. Other stores/connections do not enlist automatically.
+
+Callbacks must not recurse into storage, await, start another connection owner
+or perform external side effects. SQL rollback cannot undo application effects.
+The store publishes no events; applications may publish only after the unit's
+successful context exit. Independent connections see only committed data.
