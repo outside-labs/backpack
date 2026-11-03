@@ -28,6 +28,10 @@ Optional extras are `backpack-store[pydantic]`, `backpack-store[moves]` and
 
 ## Explicit typed records
 
+For new application models on Python 3.14+, the optional
+[Enforce Type codec](#optional-enforce-type-codec) is the preferred validation
+profile. Existing explicit codecs remain supported on Python 3.11+.
+
 ```python
 from dataclasses import dataclass
 from backpack_store import CodecRegistry, DataclassCodec
@@ -59,6 +63,39 @@ JSON payloads must be finite objects, at most 1 MiB and 64 nesting levels. Tags
 are case-sensitive NFC strings, trimmed, deduplicated and sorted (up to 64 supplied
 values of 128 characters). Unknown types/versions and invalid payloads raise typed
 errors. Importing the package opens no files or database and performs no network I/O.
+
+## Optional Enforce Type codec
+
+```sh
+python -m pip install '.[enforce-type]'
+```
+
+This adapter is available from the current source checkout; the published
+`backpack-store==0.1.0` does not include it. It requires Python 3.14+ and Enforce Type `>=0.1,<0.2`; the initial
+qualification uses published `enforce-type==0.1.0`. It compiles a trusted
+dataclass once, checks native values, dumps finite JSON objects and loads fresh
+models using public strict `check`/`dump`/`load` operations. Defaults and nested
+models follow that validator's published rules; unknown fields are refused.
+The root must have the exact registered type. No coercion profile is enabled.
+
+```python
+from backpack_store.enforce_type_codec import EnforceTypeCodec
+
+codec = EnforceTypeCodec(Note, type_key="notes.note", schema_version=1)
+```
+
+Register this codec explicitly with the store in place of another codec for
+the same model/key. The base package never imports Enforce Type and remains
+dependency-free on Python 3.11+. Installing the extra on older Python does not
+install the validator; importing the adapter reports its Python requirement.
+Supported fields are the validator's strict JSON-capable dataclass profile,
+including nested defaults, UUID/enum and tuple conversions. Existing finite
+JSON object size/depth limits still apply. Validation failures map to value-free
+`ValidationError`; unexpected validator failures map to `CodecError`. Schema
+compilation failures map to `RegistrationError`, without private exception text.
+Trusted constructors/annotation resolution can execute application code; keep
+them free of side effects. No stored model name triggers an import, and no
+existing values or payload versions are migrated automatically.
 
 ## Durable local storage
 
