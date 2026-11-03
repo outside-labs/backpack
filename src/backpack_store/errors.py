@@ -73,5 +73,9 @@ class InvalidCursorError(ValidationError):
     """A find cursor is malformed or belongs to a different query."""
 
 
+class QueryBudgetError(StorageError):
+    """A registered query exhausted its finite SQLite instruction budget."""
+
+
 class MigrationError(CodecError):
     """An explicitly registered payload migration failed."""

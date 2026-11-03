@@ -7,9 +7,10 @@ import binascii
 from dataclasses import dataclass
 import hashlib
 import json
+import sqlite3
 from typing import Generic, TypeVar
 
-from .errors import InvalidCursorError, RegistrationError, ValidationError
+from .errors import InvalidCursorError, QueryBudgetError, RegistrationError, ValidationError
 from .relational import ApplicationRow, _key, _quote
 
 T = TypeVar("T")
@@ -29,6 +30,22 @@ class Order:
 
 
 @dataclass(frozen=True)
+class TextSearch:
+    """Literal case-sensitive Unicode substring OR over declared text fields."""
+
+    fields: tuple[str, ...]
+    term: str
+
+    def __post_init__(self):
+        if (type(self.fields) not in (tuple, list) or not 1 <= len(self.fields) <= 8
+                or any(type(field) is not str for field in self.fields)
+                or len(set(self.fields)) != len(self.fields)
+                or type(self.term) is not str or len(self.term) > 256):
+            raise ValidationError("text search requires 1 to 8 distinct fields and at most 256 code points")
+        object.__setattr__(self, "fields", tuple(sorted(self.fields)))
+
+
+@dataclass(frozen=True)
 class ApplicationPage(Generic[T]):
     rows: tuple[ApplicationRow[T], ...]
     next_cursor: str | None
@@ -38,7 +55,7 @@ def _json(value):
     return json.dumps(value, ensure_ascii=True, allow_nan=False, separators=(",", ":"), sort_keys=True)
 
 
-def _prepare(model, filters, order, limit):
+def _prepare(model, filters, order, limit, search=None):
     if type(limit) is not int or not 1 <= limit <= 1000:
         raise ValidationError("query limit must be between 1 and 1000")
     if type(filters) not in (tuple, list) or len(filters) > 16:
@@ -88,6 +105,14 @@ def _prepare(model, filters, order, limit):
     signature = model._store._schemas[model._namespace]
     descriptor = [model._namespace, model._codec.type_key, signature,
                   sorted(canonical, key=_json), effective]
+    if search is not None:
+        if (not isinstance(search, TextSearch)
+                or any(field not in model._by_field or model._by_field[field].scalar is not str for field in search.fields)):
+            raise ValidationError("text search requires registered str columns")
+        if search.term:
+            clauses.append("(" + " OR ".join(f"instr({_quote(model._by_field[field].name)},?)>0" for field in search.fields) + ")")
+            parameters.extend(search.term for _ in search.fields)
+            descriptor.append([search.fields, search.term])
     fingerprint = hashlib.sha256(_json(descriptor).encode()).hexdigest()
     ordering = []
     for field, descending in effective:
@@ -146,11 +171,13 @@ def _continuation(model, effective, last):
     return "(" + " OR ".join(alternatives) + ")", parameters
 
 
-def find(model, *, filters=(), order=(), limit=50, cursor=None):
+def find(model, *, filters=(), order=(), limit=50, cursor=None, search=None, max_work=1000000):
     model._store._connection()
     if model._namespace not in model._store._initialized:
         raise RegistrationError("initialize the namespace before querying rows")
-    clauses, parameters, effective, ordering, fingerprint = _prepare(model, filters, order, limit)
+    if type(max_work) is not int or not 1 <= max_work <= 1000000:
+        raise ValidationError("query work budget must be between 1 and 1000000 instructions")
+    clauses, parameters, effective, ordering, fingerprint = _prepare(model, filters, order, limit, search)
     if cursor is not None:
         last = _read_cursor(cursor, fingerprint, model, effective)
         continuation, values = _continuation(model, effective, last)
@@ -158,9 +185,24 @@ def find(model, *, filters=(), order=(), limit=50, cursor=None):
         parameters.extend(values)
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
     with model._store._operation(model) as connection:
-        raw = connection.execute(f"SELECT * FROM {_quote(model._table)}{where} ORDER BY {','.join(ordering)} LIMIT ?",
-                                 [*parameters, limit + 1]).fetchall()
-        rows = tuple(model._row(connection, row) for row in raw[:limit])
+        spent, exhausted = 0, False
+        interval = min(1000, max_work)
+        def progress():
+            nonlocal spent, exhausted
+            spent += interval
+            exhausted = spent >= max_work
+            return int(exhausted)
+        connection.set_progress_handler(progress, interval)
+        try:
+            raw = connection.execute(f"SELECT * FROM {_quote(model._table)}{where} ORDER BY {','.join(ordering)} LIMIT ?",
+                                     [*parameters, limit + 1]).fetchall()
+            rows = tuple(model._row(connection, row) for row in raw[:limit])
+        except sqlite3.OperationalError:
+            if exhausted:
+                raise QueryBudgetError("registered query exceeded its work budget") from None
+            raise
+        finally:
+            connection.set_progress_handler(None, 0)
     next_cursor = None
     if len(raw) > limit:
         last = [getattr(rows[-1].value, field) for field, _ in effective]
