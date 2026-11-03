@@ -10,7 +10,7 @@ from unittest.mock import patch
 from backpack_store import (
     ApplicationStore, DatabaseVersionError, DataclassCodec, Index, MigrationHistory,
     MigrationStep, SchemaMigrationError, SnapshotError, migrate_sqlite, snapshot_sqlite,
-    verify_snapshot,
+    verify_snapshot, ValidationError,
 )
 from test_relational import Project, register
 
@@ -157,6 +157,19 @@ class SnapshotTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "source.sqlite"
         self.backups = Path(self.directory.name) / "backups"
+
+    def test_consumer_prefixes_preserve_filenames_and_refuse_path_components(self):
+        with closing(sqlite3.connect(self.path)) as connection:
+            connection.execute("CREATE TABLE notes (title TEXT)")
+        for prefix in ("server.sqlite3-from-v0", "Notes archive-études"):
+            receipt = snapshot_sqlite(self.path, self.backups, prefix=prefix)
+            self.assertTrue(receipt.path.name.startswith(prefix + "-"))
+            verify_snapshot(receipt)
+        before = set(self.backups.iterdir())
+        for prefix in ("", "../outside", "a/b", "a\\b", "a\n", "\ud800", "é" * 91, None):
+            with self.subTest(prefix=repr(prefix)), self.assertRaises(ValidationError):
+                snapshot_sqlite(self.path, self.backups, prefix=prefix)
+        self.assertEqual(set(self.backups.iterdir()), before)
 
     def test_committed_wal_is_included_and_receipt_detects_tampering(self):
         with closing(sqlite3.connect(self.path)) as connection:

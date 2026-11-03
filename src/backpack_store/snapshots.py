@@ -8,7 +8,6 @@ import hashlib
 import math
 import os
 from pathlib import Path
-import re
 import sqlite3
 import stat
 import tempfile
@@ -48,8 +47,14 @@ def _sync_directory(directory):
 
 def snapshot_sqlite(source, directory, *, prefix="snapshot", timeout=30.0) -> SnapshotReceipt:
     """Create a new private, integrity-checked snapshot; never overwrite a file."""
-    if type(prefix) is not str or not re.fullmatch(r"[a-z][a-z0-9_-]{0,127}", prefix):
-        raise ValidationError("snapshot prefix must use bounded lowercase ASCII")
+    try:
+        valid_prefix = (type(prefix) is str and 1 <= len(prefix.encode("utf-8")) <= 180
+                        and not any(character in '/\\' or ord(character) < 32
+                                    or 127 <= ord(character) <= 159 for character in prefix))
+    except UnicodeError:
+        valid_prefix = False
+    if not valid_prefix:
+        raise ValidationError("snapshot prefix must be a bounded filename without separators or controls")
     if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 300:
         raise ValidationError("snapshot timeout must be finite and between 0 and 300 seconds")
     path = None
