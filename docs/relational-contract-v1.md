@@ -1,7 +1,8 @@
 # Relational SQLite application contract, version 1
 
 `relational-sqlite/1` is an adopted contract for BP-SQL-02 and subsequent owning
-tasks. It is not an implemented storage backend in this revision. Existing
+tasks. The [application store](application-storage.md) implements registered
+scalar schemas and checked CRUD; subsequent tasks add the remaining facilities. Existing
 `Backpack` JSON-record APIs, database version 1, UUID identities, payload
 migrations and 32-bit record revisions retain their current behavior. New
 application domain revisions follow the separate

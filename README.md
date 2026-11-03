@@ -1,5 +1,9 @@
 # Backpack Store
 
+Relational application models are available alongside typed JSON records.
+See the [application storage guide](docs/application-storage.md) for explicit
+schema registration, checked CRUD and the optional Enforce Type profile.
+
 Backpack Store is an experimental programmable local store for typed records. The
 SQLite API stores finite JSON with explicit codecs, local identity and provenance.
 Records recover their Python types after closing and reopening the database.

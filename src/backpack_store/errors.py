@@ -33,6 +33,14 @@ class RevisionConflictError(BackpackError):
     """The record changed after the caller's expected revision."""
 
 
+class AlreadyExistsError(BackpackError):
+    """A domain key is reserved or a unique value already exists."""
+
+
+class ConstraintError(BackpackError):
+    """A relational reference or database constraint would be violated."""
+
+
 class StorageError(BackpackError):
     """A database operation failed or stored data is malformed."""
 
