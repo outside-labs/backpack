@@ -75,7 +75,7 @@ def snapshot_sqlite(source, directory, *, prefix="snapshot", timeout=30.0) -> Sn
                 if destination.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
                     raise SnapshotError("SQLite snapshot failed integrity validation")
         _regular(path)
-        with path.open("rb") as stream:
+        with path.open("r+b") as stream:
             os.fsync(stream.fileno())
         _sync_directory(directory)
         return SnapshotReceipt(path, _digest(path), path.stat().st_size)
