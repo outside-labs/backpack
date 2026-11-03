@@ -61,6 +61,14 @@ class DatabaseVersionError(StorageError):
     """This database schema version is not supported."""
 
 
+class SnapshotError(StorageError):
+    """A private, verified SQLite snapshot could not be created or verified."""
+
+
+class SchemaMigrationError(StorageError):
+    """An explicitly selected database migration failed and was rolled back."""
+
+
 class InvalidCursorError(ValidationError):
     """A find cursor is malformed or belongs to a different query."""
 

@@ -1,5 +1,7 @@
 # Relational application storage
 
+See also [ordered migrations and private snapshots](sqlite-migrations.md).
+
 `ApplicationStore` implements the scalar model and checked CRUD portion of
 [`relational-sqlite/1`](relational-contract-v1.md). It coexists with the existing
 `Backpack` JSON-record API in the same database, with separate application

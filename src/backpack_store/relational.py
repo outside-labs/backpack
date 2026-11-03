@@ -163,6 +163,11 @@ class ApplicationModel(Generic[T]):
             ddl.append(f"CREATE INDEX {_quote(index.name)} ON {_quote(self._table)} ({names})")
         return tuple(ddl)
 
+    @property
+    def schema_sql(self) -> tuple[str, ...]:
+        """Canonical target DDL for explicitly authored schema migrations."""
+        return self._ddl()
+
     def _payload(self, value: T) -> dict:
         if type(value) is not self._codec.model_type:
             raise ValidationError("value must have the exact registered relational model type")
@@ -398,11 +403,17 @@ class ApplicationStore:
             if row is None or row[0] != statement:
                 raise DatabaseVersionError("owned application schema does not match its registration")
 
-    def initialize(self, namespace: str, *, schema_version: int = 1) -> None:
+    def initialize(self, namespace: str, *, schema_version: int = 1, migrations=()) -> None:
         _identifier(namespace)
         positive_integer(schema_version, "schema_version")
-        if schema_version != 1:
-            raise DatabaseVersionError("fresh application schemas require version 1")
+        self._initialized.discard(namespace)
+        self._schemas.pop(namespace, None)
+        if schema_version > 1:
+            from .migrations import MigrationHistory, MigrationStep, _OWNERS, _history_rows, _plan, _validate_history
+            history_spec = MigrationHistory("bp_application_migrations")
+            plan = _plan(namespace, [MigrationStep(1, "initial-schema", lambda connection: None), *migrations], history_spec)
+            if len(plan) != schema_version:
+                raise DatabaseVersionError("provide the complete expected application migration plan")
         definitions, signature = self._definition(namespace)
         with self._transaction(write=True) as connection:
             for name, statement in (("bp_application_namespaces", _NAMESPACES), ("bp_application_keys", _KEYS)):
@@ -412,6 +423,8 @@ class ApplicationStore:
                 self._validate_objects(connection, {name: statement})
             history = connection.execute("SELECT schema_version,signature FROM bp_application_namespaces WHERE namespace=?", (namespace,)).fetchone()
             if history is None:
+                if schema_version != 1:
+                    raise DatabaseVersionError("fresh application schemas require version 1")
                 if any(connection.execute("SELECT 1 FROM sqlite_master WHERE name=?", (name,)).fetchone() for name in definitions):
                     raise DatabaseVersionError("existing application objects require explicit schema ownership")
                 for statement in definitions.values():
@@ -419,9 +432,48 @@ class ApplicationStore:
                 connection.execute("INSERT INTO bp_application_namespaces VALUES (?,?,?)", (namespace, schema_version, signature))
             elif tuple(history) != (schema_version, signature):
                 raise DatabaseVersionError("application schema version or registration is incompatible")
+            if schema_version > 1:
+                self._validate_objects(connection, {"bp_migration_owners": _OWNERS})
+                owner = connection.execute("SELECT history_table,scoped FROM bp_migration_owners WHERE namespace=?", (namespace,)).fetchone()
+                if owner is None or tuple(owner) != (history_spec.table, 1):
+                    raise DatabaseVersionError("application migration history ownership is incompatible")
+                rows = _history_rows(connection, namespace, history_spec)
+                _validate_history(rows, plan)
+                if len(rows) != schema_version:
+                    raise DatabaseVersionError("application migration history is incomplete")
             self._validate_objects(connection, definitions)
         self._initialized.add(namespace)
         self._schemas[namespace] = schema_version, signature
+
+    def upgrade(self, namespace: str, *, expected_version: int, migrations,
+                backup_directory, validate_current: Callable) -> object:
+        """Apply the complete selected upgrade plan to an explicitly owned namespace."""
+        from .migrations import MigrationHistory, MigrationStep, _migrate_connection, _plan
+        positive_integer(expected_version, "expected_version")
+        if not callable(validate_current):
+            raise RegistrationError("an application upgrade requires current-schema validation")
+        history = MigrationHistory("bp_application_migrations")
+        steps = _plan(namespace, [MigrationStep(1, "initial-schema", lambda connection: None), *migrations], history)
+        definitions, signature = self._definition(namespace)
+        connection = self._connection()
+        source = connection.execute("PRAGMA database_list").fetchone()[2]
+        if not source:
+            raise RegistrationError("application upgrades require a persistent database and verified backup")
+        def prepare(owned, version):
+            row = owned.execute("SELECT schema_version FROM bp_application_namespaces WHERE namespace=?", (namespace,)).fetchone()
+            if row is None or row[0] != expected_version or version != expected_version:
+                raise DatabaseVersionError("application upgrade does not match its expected owned version")
+            return validate_current(owned, version)
+        def finish(owned, version):
+            self._validate_objects(owned, definitions)
+            owned.execute("UPDATE bp_application_namespaces SET schema_version=?,signature=? WHERE namespace=?",
+                          (version, signature, namespace))
+        result = _migrate_connection(connection, source, namespace=namespace, steps=steps, history=history,
+                                     backup_directory=backup_directory, baseline=1, prepare=prepare, finish=finish)
+        self._initialized.discard(namespace)
+        self._schemas.pop(namespace, None)
+        self.initialize(namespace, schema_version=result.version, migrations=migrations)
+        return result
 
     @contextmanager
     def _database_errors(self):

@@ -29,10 +29,10 @@ class WorkItem:
     estimate: float | None = None
 
 
-def register(store, codec_type=DataclassCodec):
+def register(store, codec_type=DataclassCodec, *, project_indexes=()):
     projects = store.register(codec_type(Project, type_key="garden.project"), namespace="garden",
                               table="app_projects", primary_key="key", columns={"key": "key", "name": "name"},
-                              unique=(("name",),))
+                              unique=(("name",),), indexes=project_indexes)
     items = store.register(codec_type(WorkItem, type_key="garden.item"), namespace="garden",
                            table="app_work_items", primary_key="key",
                            columns={name: name for name in WorkItem.__dataclass_fields__},
