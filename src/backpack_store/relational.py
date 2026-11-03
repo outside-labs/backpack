@@ -404,6 +404,9 @@ class ApplicationStore:
                 raise DatabaseVersionError("owned application schema does not match its registration")
 
     def initialize(self, namespace: str, *, schema_version: int = 1, migrations=()) -> None:
+        connection = self._connection()
+        if connection.in_transaction or self._in_transform:
+            raise TransactionError("initialize application schemas outside active transactions")
         _identifier(namespace)
         positive_integer(schema_version, "schema_version")
         self._initialized.discard(namespace)
