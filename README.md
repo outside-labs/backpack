@@ -276,3 +276,6 @@ This 0.1.x project is experimental. Published GitHub releases with matching `v`
 tags run `.github/workflows/release.yaml`, verify the installed wheel and source
 distribution, and upload through PyPI trusted publishing in environment `pypi`.
 The initial release tag is `v0.1.0`.
+
+Registered queries support [bounded literal text search](docs/text-search.md)
+over explicitly registered text fields.
