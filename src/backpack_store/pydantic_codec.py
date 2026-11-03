@@ -19,7 +19,7 @@ from .errors import CodecError, RegistrationError, ValidationError
 from .records import JSONObject, json_object, positive_integer, validate_type_key
 
 if not pydantic_version.startswith("2."):
-    raise ImportError("The Backpack Pydantic codec supports Pydantic 2 only.")
+    raise ImportError("The Backpack Store Pydantic codec supports Pydantic 2 only.")
 
 T = TypeVar("T", bound=BaseModel)
 

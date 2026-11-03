@@ -1,14 +1,21 @@
-# Backpack
+# Backpack Store
 
-Backpack is an experimental programmable local store for typed records. The
+Backpack Store is an experimental programmable local store for typed records. The
 SQLite API stores finite JSON with explicit codecs, local identity and provenance.
 Records recover their Python types after closing and reopening the database.
 
-- Product: Backpack
+- Product: Backpack Store
 - Distribution: `backpack-store`
 - Import: `backpack_store`
 - Python: 3.11 or newer
 - Runtime dependencies: none
+
+The public `Backpack` class, `BackpackError`, `backpack` discovery entry point
+and `backpack.records.*` capability names keep their existing spellings for
+compatibility. Historical release/tag identities and the `outside-labs/backpack`
+repository URL are unchanged. A repository-slug rename needs a separate decision
+covering redirects, local remotes, documentation links, CI checkout references
+and downstream integration pins; it is not part of the product-name alignment.
 
 ## Installation
 
@@ -140,7 +147,7 @@ pinned family revision, runs standalone storage first, then installs the optiona
 wheels.
 
 Installed entry-point discovery advertises `backpack`; load it explicitly and bind
-an already-configured Backpack instance. The factory chooses no path and opens no
+an already-configured `Backpack` instance. The factory chooses no path and opens no
 database. The application registers trusted models before selecting tools:
 
 ```python

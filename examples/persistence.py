@@ -1,4 +1,4 @@
-"""Offline, on-disk round trip for a typed note and a synthetic Project item."""
+"""Backpack Store on-disk round trip for a note and a synthetic Project item."""
 
 from dataclasses import dataclass
 from pathlib import Path

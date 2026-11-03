@@ -1,7 +1,7 @@
 [project]
 name = "backpack-store"
 version = "0.1.0"
-description = "Store and retrieve typed local records with identity and provenance."
+description = "Backpack Store: typed local records with identity and provenance."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
