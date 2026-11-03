@@ -9,6 +9,13 @@ from test_relational import ApplicationFixture, Project, WorkItem, register
 
 
 class ApplicationTransactionTests(ApplicationFixture, unittest.TestCase):
+    def test_nested_initialization_preserves_handle_readiness(self):
+        with self.store.unit_of_work():
+            with self.assertRaises(TransactionError):
+                self.store.initialize("garden")
+            self.items.create(WorkItem("a", "Still initialized"))
+        self.assertEqual(self.items.get("a").revision, "1")
+
     def test_multi_operation_commit_and_detached_read_your_writes(self):
         with self.store.unit_of_work():
             self.projects.create(Project("garden", "Garden"))

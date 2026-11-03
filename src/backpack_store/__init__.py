@@ -7,6 +7,8 @@ from .errors import (
     CodecError,
     ConstraintError,
     DatabaseVersionError,
+    SchemaMigrationError,
+    SnapshotError,
     InvalidCursorError,
     MigrationError,
     NotFoundError,
@@ -25,6 +27,8 @@ from .store import Backpack, ExportResult, FindPage, WriteResult
 from .relational import ApplicationModel, ApplicationRow, ApplicationStore, ForeignKey, Index
 from .async_store import AsyncApplicationStore, DispatchedCancellation, OperationReceipt
 from .queries import ApplicationPage, Filter, Order
+from .migrations import MigrationHistory, MigrationResult, MigrationStep, migrate_sqlite
+from .snapshots import SnapshotReceipt, snapshot_sqlite, verify_snapshot
 
 __all__ = [
     "AlreadyExistsError",
@@ -34,6 +38,15 @@ __all__ = [
     "ApplicationPage",
     "Filter",
     "Order",
+    "MigrationHistory",
+    "MigrationResult",
+    "MigrationStep",
+    "SchemaMigrationError",
+    "SnapshotError",
+    "SnapshotReceipt",
+    "migrate_sqlite",
+    "snapshot_sqlite",
+    "verify_snapshot",
     "AsyncApplicationStore",
     "DispatchedCancellation",
     "OperationReceipt",
