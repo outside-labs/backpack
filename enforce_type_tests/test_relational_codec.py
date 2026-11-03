@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from backpack_store import ApplicationStore, ValidationError
+from backpack_store import ApplicationStore, Filter, ValidationError
 from backpack_store.enforce_type_codec import EnforceTypeCodec
 
 
@@ -35,3 +35,4 @@ class EnforceRelationalTests(unittest.TestCase):
                 items = store.register(codec, **options)
                 store.initialize("garden")
                 self.assertEqual(items.get("a"), changed)
+                self.assertEqual(items.find(filters=[Filter("done", "eq", True)]).rows, (changed,))

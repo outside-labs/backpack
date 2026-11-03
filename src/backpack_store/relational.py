@@ -293,6 +293,11 @@ class ApplicationModel(Generic[T]):
             rows = connection.execute(f"SELECT * FROM {_quote(self._table)} {where} ORDER BY {column} LIMIT ?", [*parameters, limit]).fetchall()
             return tuple(self._row(connection, row) for row in rows)
 
+    def find(self, *, filters=(), order=(), limit=50, cursor=None):
+        """Read a bounded typed page with query-bound keyset continuation."""
+        from .queries import find
+        return find(self, filters=filters, order=order, limit=limit, cursor=cursor)
+
 
 class ApplicationStore:
     """Explicit model registry and transactional schema, owned by one thread."""
