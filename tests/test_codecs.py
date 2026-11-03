@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+import subprocess
+import sys
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
@@ -51,6 +53,22 @@ class Untyped:
 
 
 class CodecTests(unittest.TestCase):
+    def test_optional_enforce_codec_has_no_base_import_requirement(self):
+        code = '''import sys,backpack_store
+assert 'enforce_type' not in sys.modules
+class Refuse:
+ def find_spec(self, fullname, *args):
+  if fullname == 'enforce_type': raise ModuleNotFoundError('blocked optional dependency')
+sys.meta_path.insert(0, Refuse())
+try:
+ import backpack_store.enforce_type_codec
+except ImportError as error:
+ assert ('3.14' if sys.version_info < (3,14) else '[enforce-type]') in str(error)
+else:
+ raise AssertionError('optional import unexpectedly succeeded')
+'''
+        subprocess.run([sys.executable, "-I", "-c", code], check=True, capture_output=True)
+
     def setUp(self):
         self.registry = CodecRegistry()
         self.note = DataclassCodec(Note, type_key="notes.note")
