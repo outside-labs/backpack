@@ -10,7 +10,7 @@ import json
 import sqlite3
 from typing import Generic, TypeVar
 
-from .errors import InvalidCursorError, QueryBudgetError, RegistrationError, ValidationError
+from .errors import InvalidCursorError, QueryBudgetError, RegistrationError, StorageError, ValidationError
 from .relational import ApplicationRow, _key, _quote
 
 T = TypeVar("T")
@@ -197,7 +197,7 @@ def find(model, *, filters=(), order=(), limit=50, cursor=None, search=None, max
             raw = connection.execute(f"SELECT * FROM {_quote(model._table)}{where} ORDER BY {','.join(ordering)} LIMIT ?",
                                      [*parameters, limit + 1]).fetchall()
             rows = tuple(model._row(connection, row) for row in raw[:limit])
-        except sqlite3.OperationalError:
+        except (sqlite3.OperationalError, StorageError):
             if exhausted:
                 raise QueryBudgetError("registered query exceeded its work budget") from None
             raise
