@@ -99,6 +99,10 @@ existing values or payload versions are migrated automatically.
 
 ## Durable local storage
 
+The separate [relational SQLite application contract](docs/relational-contract-v1.md)
+defines the planned explicit model/key/query profile and executable SQL reference
+examples. That backend is not implemented by the JSON-record APIs below.
+
 ```python
 from backpack_store import Backpack
 
