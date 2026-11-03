@@ -5,8 +5,9 @@ import subprocess
 import sys
 import threading
 import unittest
+from unittest.mock import patch
 
-from backpack_store import ApplicationStore, AsyncApplicationStore, DispatchedCancellation, Filter, InvalidCursorError, Order, QueryBudgetError, TextSearch, ValidationError
+from backpack_store import ApplicationStore, AsyncApplicationStore, DispatchedCancellation, Filter, InvalidCursorError, Order, QueryBudgetError, StorageError, TextSearch, ValidationError
 from test_relational import ApplicationFixture, WorkItem, register
 
 
@@ -59,6 +60,25 @@ class TextSearchTests(ApplicationFixture, unittest.TestCase):
         subprocess.run([sys.executable, "-c", code, str(self.path)], check=True, env=env, capture_output=True)
         row = self.items.find(search=TextSearch(["title"], "after")).rows[0]
         self.assertEqual((row.key, row.revision), ("a", "2"))
+
+    def test_work_exhaustion_during_trusted_decode_keeps_budget_classification(self):
+        self.items.create(WorkItem("a", "private value"))
+        connection = self.store._connection()
+        original = self.items._codec.decode
+        def decoding(payload):
+            # A trusted codec can perform SQLite work while a row is hydrated.
+            # The row validator redacts the interruption; find retains its budget.
+            connection.execute("WITH RECURSIVE steps(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM steps WHERE n<10000) SELECT sum(n) FROM steps").fetchone()
+            return original(payload)
+        with patch.object(type(self.items._codec), "decode", side_effect=decoding):
+            with self.assertRaises(QueryBudgetError) as caught:
+                self.items.find(max_work=1000)
+        self.assertNotIn("private", str(caught.exception))
+        self.assertEqual(self.items.find().rows[0].revision, "1")
+        with patch.object(type(self.items._codec), "decode", side_effect=ValueError("private codec failure")):
+            with self.assertRaises(StorageError) as caught:
+                self.items.find()
+            self.assertNotIsInstance(caught.exception, QueryBudgetError)
 
 
 class AsyncSearchTests(unittest.IsolatedAsyncioTestCase):
