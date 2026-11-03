@@ -2,8 +2,10 @@
 
 from .codecs import Codec, CodecRegistry, DataclassCodec, EncodedValue
 from .errors import (
+    AlreadyExistsError,
     BackpackError,
     CodecError,
+    ConstraintError,
     DatabaseVersionError,
     InvalidCursorError,
     MigrationError,
@@ -18,8 +20,16 @@ from .errors import (
 )
 from .records import JSONObject, JSONValue, Provenance, RawRecord, Record
 from .store import Backpack, ExportResult, FindPage, WriteResult
+from .relational import ApplicationModel, ApplicationRow, ApplicationStore, ForeignKey, Index
 
 __all__ = [
+    "AlreadyExistsError",
+    "ApplicationModel",
+    "ApplicationRow",
+    "ApplicationStore",
+    "ConstraintError",
+    "ForeignKey",
+    "Index",
     "Backpack",
     "ExportResult",
     "MigrationError",
