@@ -1,6 +1,6 @@
 # Backpack Store
 
-Relational application models are available alongside typed JSON records.
+The unreleased source checkout adds relational models alongside typed JSON records.
 See the [application storage guide](docs/application-storage.md) for explicit
 schema registration, checked CRUD and the optional Enforce Type profile.
 

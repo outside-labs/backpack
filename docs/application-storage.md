@@ -1,5 +1,7 @@
 # Relational application storage
 
+The APIs in this guide are unreleased source additions.
+
 See also [ordered migrations and private snapshots](sqlite-migrations.md).
 The [one-host SQLite profile](sqlite-application-profile.md) records connection,
 journal, durability, process ownership and recovery acceptance.
