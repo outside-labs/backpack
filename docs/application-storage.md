@@ -53,8 +53,8 @@ reservation permanently, preventing stale clients from modifying a recreated
 resource. Errors omit submitted values and SQL.
 
 `list(limit=1..1000, after=key)` provides bounded primary-key traversal. Typed
-filters and query-bound cursors are owned by BP-QUERY-01; async ownership and
-upgrades remain in their subsequent tasks.
+filters and query-bound cursors are owned by BP-QUERY-01; upgrades remain in
+their subsequent task.
 
 ## Atomic updates and units of work
 
@@ -85,3 +85,41 @@ Callbacks must not recurse into storage, await, start another connection owner
 or perform external side effects. SQL rollback cannot undo application effects.
 The store publishes no events; applications may publish only after the unit's
 successful context exit. Independent connections see only committed data.
+
+## Asynchronous ownership and cancellation
+
+`AsyncApplicationStore` uses only the standard library. `open(path,
+configure=callback, queue_limit=64, timeout=5.0)` starts one owned worker thread.
+The synchronous configuration callback registers and initializes an
+`ApplicationStore` there and returns application-selected handles/state.
+`await facade.run(callback)` passes that state to a synchronous callback on the
+same worker. `transactional=True` wraps the complete callback in a unit of work.
+
+```python
+async def save(facade, value):
+    return await facade.run(lambda models: models["items"].create(value))
+```
+
+The connection, transactions and callbacks stay on that worker for their whole
+lifetime. Keep callback inputs stable until completion and return detached
+results, not connection-owned handles. Callbacks must be finite and obey the
+same side-effect/reentrancy restrictions as synchronous transforms.
+
+The queue admits 1–1024 pending jobs (default 64), excluding the active job.
+Full admission raises `StorageBusyError` immediately; the application owns
+retry/backpressure. A facade belongs to one event loop and process. Open a new
+facade in each worker process rather than sharing it through a fork.
+
+Cancellation before dispatch raises ordinary `asyncio.CancelledError` and skips
+the job. After dispatch it raises `DispatchedCancellation`, a `CancelledError`
+subclass with `receipt`. `await error.receipt.wait()` returns the actual result
+or failure and may be retried after cancellation. A committed mutation is never
+described as rolled back. Applications that discard a receipt must reload
+before retrying a mutation. Cancelling a caller does not interrupt SQLite or
+run a transform twice.
+
+`await facade.aclose()` stops admission, drains accepted work, closes the
+connection on its worker and waits for thread exit. Cancellation of a close
+waiter leaves cleanup running; another `aclose()` can await it. Failed or
+cancelled startup also closes its owned connection. `async with facade` provides
+the same close behavior. Stop request admission before closing the facade.

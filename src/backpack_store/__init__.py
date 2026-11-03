@@ -13,6 +13,7 @@ from .errors import (
     RegistrationError,
     RevisionConflictError,
     StorageError,
+    StorageBusyError,
     StoreClosedError,
     TransactionError,
     UnknownTypeError,
@@ -22,12 +23,16 @@ from .errors import (
 from .records import JSONObject, JSONValue, Provenance, RawRecord, Record
 from .store import Backpack, ExportResult, FindPage, WriteResult
 from .relational import ApplicationModel, ApplicationRow, ApplicationStore, ForeignKey, Index
+from .async_store import AsyncApplicationStore, DispatchedCancellation, OperationReceipt
 
 __all__ = [
     "AlreadyExistsError",
     "ApplicationModel",
     "ApplicationRow",
     "ApplicationStore",
+    "AsyncApplicationStore",
+    "DispatchedCancellation",
+    "OperationReceipt",
     "ConstraintError",
     "ForeignKey",
     "Index",
@@ -53,6 +58,7 @@ __all__ = [
     "RegistrationError",
     "RevisionConflictError",
     "StorageError",
+    "StorageBusyError",
     "StoreClosedError",
     "TransactionError",
     "UnknownTypeError",

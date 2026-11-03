@@ -53,6 +53,10 @@ class TransactionError(StorageError):
     """A unit of work or transform violated its transaction contract."""
 
 
+class StorageBusyError(StorageError):
+    """The bounded asynchronous work queue has no available slot."""
+
+
 class DatabaseVersionError(StorageError):
     """This database schema version is not supported."""
 
