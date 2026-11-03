@@ -2,6 +2,7 @@ from contextlib import closing
 from pathlib import Path
 import os
 import sqlite3
+import stat
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -185,6 +186,19 @@ class SnapshotTests(unittest.TestCase):
                 snapshot_sqlite(self.path, self.backups)
         self.assertEqual(list(self.backups.iterdir()), [])
         self.assertEqual(self.path.read_bytes(), before)
+
+    def test_snapshot_synchronization_supports_write_required_file_handles(self):
+        with closing(sqlite3.connect(self.path)) as connection:
+            connection.execute("CREATE TABLE notes (title TEXT)")
+        synchronize = os.fsync
+        def require_write_access(descriptor):
+            if stat.S_ISREG(os.fstat(descriptor).st_mode):
+                # Zero-byte writes check access without changing snapshot data.
+                os.write(descriptor, b"")
+            synchronize(descriptor)
+        with patch("backpack_store.snapshots.os.fsync", side_effect=require_write_access):
+            receipt = snapshot_sqlite(self.path, self.backups)
+        verify_snapshot(receipt)
 
     @unittest.skipIf(os.name == "nt", "symlink privileges vary on Windows")
     def test_symlink_and_nonprivate_destination_are_refused(self):
