@@ -12,6 +12,7 @@ import math
 import re
 import sqlite3
 import threading
+import time
 import types
 from typing import Generic, TypeVar, Union, get_args, get_origin, get_type_hints
 from uuid import uuid4
@@ -318,8 +319,30 @@ class ApplicationStore:
         self._in_transform = False
 
     @classmethod
-    def open(cls, path, *, timeout: float = 5.0) -> ApplicationStore:
-        return cls(Backpack.open(path, timeout=timeout))
+    def open(cls, path, *, timeout: float = 5.0, journal_mode: str = "wal") -> ApplicationStore:
+        if type(journal_mode) is not str or journal_mode not in ("wal", "delete"):
+            raise ValidationError("application journal mode must be wal or delete")
+        records = Backpack.open(path, timeout=timeout)
+        try:
+            connection = records._live_connection()
+            deadline = time.monotonic() + timeout
+            while True:
+                try:
+                    mode = connection.execute("PRAGMA journal_mode=" + journal_mode.upper()).fetchone()[0]
+                    break
+                except sqlite3.OperationalError as error:
+                    if error.sqlite_errorcode & 0xff not in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED) or time.monotonic() >= deadline:
+                        raise
+                    time.sleep(min(0.01, max(0, deadline - time.monotonic())))
+            if mode != journal_mode and mode != "memory":
+                raise StorageError("SQLite could not select the requested application journal profile")
+            connection.execute("PRAGMA synchronous=FULL")
+            return cls(records)
+        except BaseException as error:
+            records.close()
+            if isinstance(error, sqlite3.Error):
+                raise StorageError("SQLite application profile could not be initialized") from None
+            raise
 
     def _connection(self):
         if threading.get_ident() != self._owner:

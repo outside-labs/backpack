@@ -53,7 +53,7 @@ class _Work:
 class AsyncApplicationStore(Generic[T]):
     """One event-loop owner, one bounded queue, one SQLite-owning worker thread."""
 
-    def __init__(self, path, configure, timeout, queue_limit):
+    def __init__(self, path, configure, timeout, queue_limit, journal_mode):
         self._loop = asyncio.get_running_loop()
         self._pid = os.getpid()
         self._queue: Queue[_Work] = Queue(maxsize=queue_limit)
@@ -61,16 +61,16 @@ class AsyncApplicationStore(Generic[T]):
         self._admission = threading.Lock()
         self._ready: Future = Future()
         self._closed: Future = Future()
-        self._thread = threading.Thread(target=self._worker, args=(path, configure, timeout), name="application-storage")
+        self._thread = threading.Thread(target=self._worker, args=(path, configure, timeout, journal_mode), name="application-storage")
 
     @classmethod
     async def open(cls, path, *, configure: Callable[[ApplicationStore], T],
-                   timeout: float = 5.0, queue_limit: int = 64) -> AsyncApplicationStore[T]:
+                   timeout: float = 5.0, queue_limit: int = 64, journal_mode: str = "wal") -> AsyncApplicationStore[T]:
         if type(queue_limit) is not int or not 1 <= queue_limit <= 1024:
             raise ValidationError("async queue limit must be between 1 and 1024")
         if not callable(configure) or inspect.iscoroutinefunction(configure):
             raise ValidationError("async storage requires a synchronous configuration callback")
-        instance = cls(path, configure, timeout, queue_limit)
+        instance = cls(path, configure, timeout, queue_limit, journal_mode)
         ready = OperationReceipt(asyncio.wrap_future(instance._ready))
         instance._thread.start()
         try:
@@ -90,10 +90,10 @@ class AsyncApplicationStore(Generic[T]):
             raise ValidationError("storage callbacks must return synchronously")
         return result
 
-    def _worker(self, path, configure, timeout):
+    def _worker(self, path, configure, timeout, journal_mode):
         store = None
         try:
-            store = ApplicationStore.open(path, timeout=timeout)
+            store = ApplicationStore.open(path, timeout=timeout, journal_mode=journal_mode)
             state = self._synchronous(configure, store)
             self._ready.set_result(None)
             while True:

@@ -53,6 +53,19 @@ class ApplicationFixture:
 
 
 class RelationalTests(ApplicationFixture, unittest.TestCase):
+    def test_sqlite_profile_modes_and_validation_before_open(self):
+        connection = self.store._connection()
+        self.assertEqual(connection.execute("PRAGMA journal_mode").fetchone()[0], "wal")
+        self.assertEqual(connection.execute("PRAGMA synchronous").fetchone()[0], 2)
+        self.assertEqual(connection.execute("PRAGMA foreign_keys").fetchone()[0], 1)
+        path = Path(self.directory.name) / "delete.sqlite"
+        with ApplicationStore.open(path, journal_mode="delete") as store:
+            self.assertEqual(store._connection().execute("PRAGMA journal_mode").fetchone()[0], "delete")
+        invalid = Path(self.directory.name) / "invalid.sqlite"
+        with self.assertRaises(ValidationError):
+            ApplicationStore.open(invalid, journal_mode="arbitrary SQL")
+        self.assertFalse(invalid.exists())
+
     def test_create_reopen_detachment_and_legacy_records(self):
         value = WorkItem("item-01", "Garden", estimate=1.5)
         row = self.items.create(value)

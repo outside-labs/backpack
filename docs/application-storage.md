@@ -1,6 +1,10 @@
 # Relational application storage
 
+The APIs in this guide are unreleased source additions.
+
 See also [ordered migrations and private snapshots](sqlite-migrations.md).
+The [one-host SQLite profile](sqlite-application-profile.md) records connection,
+journal, durability, process ownership and recovery acceptance.
 
 `ApplicationStore` implements the scalar model and checked CRUD portion of
 [`relational-sqlite/1`](relational-contract-v1.md). It coexists with the existing

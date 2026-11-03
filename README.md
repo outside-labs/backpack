@@ -1,6 +1,6 @@
 # Backpack Store
 
-Relational application models are available alongside typed JSON records.
+The unreleased source checkout adds relational models alongside typed JSON records.
 See the [application storage guide](docs/application-storage.md) for explicit
 schema registration, checked CRUD and the optional Enforce Type profile.
 
@@ -103,9 +103,11 @@ existing values or payload versions are migrated automatically.
 
 ## Durable local storage
 
-The separate [relational SQLite application contract](docs/relational-contract-v1.md)
-defines the planned explicit model/key/query profile and executable SQL reference
-examples. That backend is not implemented by the JSON-record APIs below.
+The [relational SQLite application contract](docs/relational-contract-v1.md)
+is implemented through `ApplicationStore`: explicit scalar models and keys,
+checked transactions, typed queries, owned async work and verified upgrades.
+See the [application guide](docs/application-storage.md) and
+[qualified one-host profile](docs/sqlite-application-profile.md).
 
 ```python
 from backpack_store import Backpack
