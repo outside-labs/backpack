@@ -17,7 +17,7 @@ class Note:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Serve typed notes from an explicit local SQLite file."
+        description="Serve Backpack Store notes from an explicit local SQLite file."
     )
     parser.add_argument("--database", required=True)
     parser.add_argument("--profile", choices=("read", "write"), required=True)

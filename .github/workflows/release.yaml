@@ -1,4 +1,4 @@
-name: Publish Backpack to PyPI
+name: Publish Backpack Store to PyPI
 
 on:
   release:
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build and verify Backpack distribution
+    name: Build and verify Backpack Store distribution
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -42,7 +42,7 @@ jobs:
         run: uv build --out-dir dist
       - name: Check distribution metadata
         run: python -m twine check --strict dist/*
-      - name: Verify installed Backpack wheel
+      - name: Verify installed Backpack Store wheel
         shell: bash
         run: |
           test_venv="${RUNNER_TEMP}/backpack-wheel"
@@ -69,7 +69,7 @@ jobs:
           retention-days: 7
 
   publish:
-    name: Publish Backpack distribution to PyPI
+    name: Publish Backpack Store distribution to PyPI
     needs: build
     runs-on: ubuntu-latest
     environment:

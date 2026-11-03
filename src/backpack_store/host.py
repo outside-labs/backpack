@@ -22,14 +22,14 @@ def build_catalog(
 
     names = tuple(names)
     if not names:
-        raise ValueError("Select at least one Backpack capability.")
+        raise ValueError("Select at least one Backpack Store capability.")
     if not allow_writes and any(name in WRITE_CAPABILITIES for name in names):
         raise ValueError(
             "Select the local write profile explicitly with allow_writes=True."
         )
     entries = [entry for entry in discover_providers() if entry.name == "backpack"]
     if len(entries) != 1:
-        raise ValueError("Install exactly one Backpack provider.")
+        raise ValueError("Install exactly one Backpack Store provider.")
     moves = Moves(target=store)
     load_provider(entries[0], moves.registry)
     return CapabilityCatalog(moves, names)

@@ -1,4 +1,4 @@
-"""Experimental typed local records with explicitly registered codecs."""
+"""Backpack Store: typed local records with explicitly registered codecs."""
 
 from .codecs import Codec, CodecRegistry, DataclassCodec, EncodedValue
 from .errors import (
