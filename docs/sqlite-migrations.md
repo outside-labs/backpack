@@ -1,7 +1,7 @@
 # SQLite snapshots and migrations
 
 These standard-library facilities implement reusable mechanics from
-[Pretty Notebook's inventory](https://github.com/outside-labs/pretty-notebook/blob/main/docs/storage-extraction.md).
+[Pretty Notebook's inventory](https://github.com/wispsy/pretty-notebook/blob/main/docs/storage-extraction.md).
 Consumer schemas, ORM connections, authentication, filesystem publication and
 whole-site recovery remain application-owned.
 

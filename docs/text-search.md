@@ -34,4 +34,4 @@ processes/reopens. Keyset pages across concurrent edits are fresh reads, not a
 frozen multi-page snapshot; refresh explicitly when a stable new view is needed.
 The record-store API and previous non-search cursor profile are unchanged.
 
-Contract: [tabular/1](https://github.com/outside-labs/compose_application/blob/d8c4e3a1d4cd1979222c0dddcbf0a14d44ee415c/docs/tabular-v1.md).
+Contract: [tabular/1](https://github.com/wispsy/compose_application/blob/d8c4e3a1d4cd1979222c0dddcbf0a14d44ee415c/docs/tabular-v1.md).

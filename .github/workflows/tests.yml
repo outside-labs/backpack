@@ -52,7 +52,7 @@ jobs:
       - name: Checkout tested capability packages
         uses: actions/checkout@v4
         with:
-          repository: outside-labs/hidden_moves
+          repository: wispsy/hidden_moves
           ref: c3a2d9c808ee62a88970f7be7ca970c1dd539911
           path: .dependencies/hidden_moves
       - name: Build and install optional integration wheels
