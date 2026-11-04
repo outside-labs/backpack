@@ -28,10 +28,10 @@ host = ["hidden-moves>=0.1,<0.2", "hidden-moves-mcp>=0.1,<0.2"]
 backpack = "backpack_store.integration:provide_moves"
 
 [project.urls]
-Homepage = "https://github.com/outside-labs/backpack"
-Repository = "https://github.com/outside-labs/backpack"
-Issues = "https://github.com/outside-labs/backpack/issues"
-Documentation = "https://github.com/outside-labs/backpack#readme"
+Homepage = "https://github.com/wispsy/backpack"
+Repository = "https://github.com/wispsy/backpack"
+Issues = "https://github.com/wispsy/backpack/issues"
+Documentation = "https://github.com/wispsy/backpack#readme"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]

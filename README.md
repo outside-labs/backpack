@@ -16,7 +16,7 @@ Records recover their Python types after closing and reopening the database.
 
 The public `Backpack` class, `BackpackError`, `backpack` discovery entry point
 and `backpack.records.*` capability names keep their existing spellings for
-compatibility. Historical release/tag identities and the `outside-labs/backpack`
+compatibility. Historical release/tag identities and the `wispsy/backpack`
 repository URL are unchanged. A repository-slug rename needs a separate decision
 covering redirects, local remotes, documentation links, CI checkout references
 and downstream integration pins; it is not part of the product-name alignment.

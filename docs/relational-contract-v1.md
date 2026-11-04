@@ -9,7 +9,7 @@ SQLite slice. Existing
 `Backpack` JSON-record APIs, database version 1, UUID identities, payload
 migrations and 32-bit record revisions retain their current behavior. New
 application domain revisions follow the separate
-[shared contract](https://github.com/outside-labs/compose_application/blob/main/docs/application-contracts-v1.md).
+[shared contract](https://github.com/wispsy/compose_application/blob/main/docs/application-contracts-v1.md).
 
 Run the [executable SQLite reference examples](../conformance_tests/test_relational_reference.py)
 with `python -m unittest discover -s conformance_tests -v`. These examples prove
